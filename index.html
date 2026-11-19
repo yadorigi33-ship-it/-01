@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>ステージ攻略アニメブラウザゲーム</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Helvetica Neue', Arial, sans-serif; background: #111; color: #fff; width: 100vw; height: 100vh; height: 100dvh; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+#game-container { width: 100%; height: 100%; max-width: 480px; max-height: 854px; background: #222; position: relative; overflow: hidden; border: 2px solid #444; }
+button { padding: 12px 24px; font: inherit; font-size: 16px; font-weight: bold; background: #ff4757; color: #fff; border: none; border-radius: 8px; cursor: pointer; box-shadow: 0 4px #ff6b81; -webkit-tap-highlight-color: transparent; }
+button:active:not(:disabled) { transform: translateY(2px); box-shadow: 0 2px #ff6b81; }
+button:disabled { background: #555 !important; box-shadow: none !important; color: #999 !important; cursor: not-allowed; }
+button:focus-visible, select:focus-visible, input:focus-visible { outline: 3px solid #ffd32a; outline-offset: 3px; }
+.screen { width: 100%; height: 100%; position: absolute; inset: 0; display: none; flex-direction: column; justify-content: center; align-items: center; padding: 20px; background-size: cover; background-position: center; background-repeat: no-repeat; }
+.screen.active { display: flex; }
+#title-screen { padding: 0; position: relative; background: radial-gradient(ellipse at 50% 36%, #6b2036, #1b131d 70%); }
+.title-bg-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1; }
+.title-fallback { position: absolute; top: 19%; left: 16px; right: 16px; text-align: center; z-index: 2; text-shadow: 0 4px 16px #000; }
+.title-fallback strong { display: block; font-size: clamp(27px, 8vw, 43px); letter-spacing: 3px; text-shadow: 0 3px 1px #4b192e, 0 0 20px #ec697b, 0 8px 25px #060510; }
+.title-fallback span { display: block; color: #ffd7dc; font-size: 13px; margin-top: 14px; letter-spacing: 2px; text-shadow: 0 2px 8px #05050b; }
+.title-start-btn { position: absolute; bottom: max(60px, env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%); z-index: 2; font-size: 20px; padding: 15px 40px; letter-spacing: 2px; white-space: nowrap; }
+.title-start-btn:active { transform: translate(-50%, 2px) !important; }
+#prologue-screen { background-color: #000; justify-content: space-between; padding: 30px 20px; }
+#prologue-text { background: rgba(4,4,12,.70); border: 1px solid #e58b9366; border-radius: 12px; padding: 15px; }
+#char-select-screen::before { content: ""; position: absolute; inset: 0; background: linear-gradient(0deg,#0b0b1e66,#11112733); pointer-events: none; }
+#char-select-screen > * { position: relative; z-index: 1; }
+.prologue-title { font-size: 20px; font-weight: bold; color: #ff6b81; border-bottom: 2px solid #ff4757; width: 100%; text-align: center; padding-bottom: 8px; margin-top: 10px; }
+.prologue-text-box { width: 100%; flex: 1; min-height: 0; display: flex; justify-content: center; align-items: center; padding: 10px; overflow-y: auto; }
+.prologue-text { font-size: 15px; line-height: 1.8; text-shadow: 0 2px 4px rgba(0,0,0,.9); width: 100%; white-space: pre-wrap; user-select: text; }
+#tutorial-screen { background-color: #1e272e; justify-content: flex-start; padding: 20px; overflow-y: auto; }
+.tutorial-title { font-size: 22px; font-weight: bold; color: #ffd32a; text-shadow: 0 2px 4px #0008; margin: 10px 0 25px; }
+.tutorial-list { width: 100%; display: flex; flex-direction: column; gap: 15px; flex: 1; }
+.tutorial-item { background: rgba(0,0,0,.6); border: 1px solid #ffffff22; border-radius: 8px; padding: 12px; }
+.tutorial-item-header { font-size: 15px; font-weight: bold; color: #ff4757; margin-bottom: 5px; display: flex; align-items: center; gap: 6px; }
+.tutorial-item-desc { font-size: 12.5px; line-height: 1.5; color: #dcdde1; }
+#char-select-screen { justify-content: flex-start; overflow-y: auto; }
+.select-heading { width: 100%; display: flex; justify-content: space-between; align-items: center; gap: 10px; margin: 10px 0 20px; }
+.select-heading h2 { font-size: 22px; text-align: center; flex: 1; text-shadow: 0 2px 4px #0008; }
+#char-list { width: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 12px; }
+#char-select-main-row { width: 100%; display: flex; justify-content: center; align-items: stretch; gap: 10px; }
+.char-select-btn { flex: 0 1 48%; min-width: 0; background: #2f3542 !important; opacity: 1 !important; border: 2px solid #535c68; border-radius: 12px; padding: 5px; text-align: center; display: flex; flex-direction: column; align-items: center; color: white; box-shadow: 0 6px 12px #0009; overflow: hidden; }
+.char-select-btn:active { transform: scale(.98) !important; }
+.char-select-btn-img { width: 100%; aspect-ratio: 4/5; background: linear-gradient(160deg,#65415cbb,#19233dcc); border-radius: 8px; margin-bottom: 6px; object-fit: contain; display: block; }
+.char-select-placeholder { display: none; width: 100%; aspect-ratio: 4/5; border-radius: 8px; margin-bottom: 6px; align-items: center; justify-content: center; background: linear-gradient(150deg, #46283b, #1b2234); color: #e6d7e3; font-size: 17px; font-weight: bold; }
+.char-select-btn-info { width: 100%; padding: 2px 4px 4px; }
+.char-select-btn-name { font-size: 15px; font-weight: bold; margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.char-select-btn-hp { font-size: 11px; color: #a4b0be; margin-bottom: 4px; }
+.char-select-btn-hint { font-size: 11px; color: #ff6b81; font-weight: bold; letter-spacing: .5px; }
+#ex-select-btn-row { width: 100%; display: flex; justify-content: center; }
+.ex-select-btn { width: 98%; background: #1e1e1e !important; border: 2px solid #ffd32a; border-radius: 10px; padding: 12px 15px; color: white; display: flex; align-items: center; box-shadow: 0 4px 10px #ffd32a33; text-align: left; }
+.ex-select-btn-icon { font-size: 22px; color: #ffd32a; margin-right: 12px; }
+.ex-select-btn-text { display: flex; flex-direction: column; flex: 1; }
+.ex-select-btn-name { font-size: 15px; font-weight: bold; margin-bottom: 2px; }
+.ex-select-btn-hint { font-size: 11px; color: #ffd32a; }
+#battle-screen { justify-content: space-between; padding: 10px; }
+#stage-info { width: 100%; text-align: center; font-size: 18px; font-weight: bold; padding: 5px; background: #0009; border-radius: 5px; z-index: 10; margin-bottom: 5px; }
+#battle-field { width: 100%; flex: 1; min-height: 0; display: flex; gap: 8px; position: relative; overflow: hidden; margin-bottom: 5px; }
+.battle-side { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; background: #0006; padding: 6px; border-radius: 8px; border: 1px solid #ffffff22; overflow: hidden; }
+.char-name { font-size: 13px; font-weight: bold; margin-bottom: 3px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; }
+.hp-bar-container { width: 100%; height: 10px; flex-shrink: 0; background: #333; border-radius: 5px; overflow: hidden; margin-bottom: 3px; border: 1px solid #555; }
+.hp-bar { width: 100%; height: 100%; background: #2ed573; transition: width .3s; }
+.char-img-box { width: 100%; flex: 1; background: linear-gradient(155deg,#311d3566,#080c1d80); border-radius: 6px; overflow: hidden; display: flex; justify-content: center; align-items: center; position: relative; margin-bottom: 3px; min-height: 0; }
+.char-img { width: 100%; height: 100%; object-fit: contain; position: relative; z-index: 1; }
+.char-img-box.image-missing::after { content: attr(data-fallback); position: absolute; inset: 10px; display: flex; align-items: center; justify-content: center; text-align: center; font-size: 15px; font-weight: bold; color: #e8d3dd; border: 1px dashed #ffffff44; border-radius: 6px; background: #171923aa; white-space: pre-wrap; }
+.msg-window { width: 100%; height: 60px; flex-shrink: 0; background: #000c; border: 1px solid #555; border-radius: 5px; padding: 4px; font-size: 11px; overflow-y: auto; line-height: 1.3; overflow-wrap: anywhere; white-space: pre-wrap; }
+#control-area { width: 100%; display: flex; flex-direction: column; gap: 6px; z-index: 10; padding: 2px 0; }
+#battle-commands { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 5px; }
+#battle-commands button { padding: 8px 3px; font-size: 12px; border-radius: 5px; }
+#config-row { display: flex; justify-content: space-between; align-items: center; background: #0008; padding: 3px 8px; border-radius: 5px; font-size: 11px; }
+#config-btn, .tiny-config-btn { padding: 4px 8px; font-size: 10px; background: #747d8c; box-shadow: 0 2px #57606f; }
+#dialogue-overlay { display: none; position: absolute; bottom: 10px; left: 10px; right: 10px; background: #000e; border: 2px solid #ff4757; border-radius: 10px; padding: 15px; flex-direction: column; gap: 10px; z-index: 20; }
+#dialogue-speaker { font-weight: bold; color: #ff6b81; font-size: 14px; border-bottom: 1px solid #444; padding-bottom: 3px; }
+#dialogue-text { font-size: 14px; min-height: 48px; line-height: 1.4; white-space: pre-wrap; }
+#dialogue-btn-area { display: flex; justify-content: flex-end; }
+#clear-banner { display: none; position: absolute; top: 35%; left: 0; width: 100%; background: #000d; color: #ffd32a; font-size: 30px; font-weight: bold; text-align: center; padding: 20px 0; z-index: 30; letter-spacing: 3px; border-top: 3px solid #ffd32a; border-bottom: 3px solid #ffd32a; pointer-events: none; }
+#epilogue-screen { justify-content: space-between; padding: 15px; background-color: #000; }
+.epilogue-event-container { width: 100%; flex: 1; display: flex; justify-content: center; align-items: center; min-height: 0; margin-bottom: 10px; }
+.epilogue-event-img { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 8px; box-shadow: 0 4px 15px #000b; display: none; }
+#epilogue-overlay { width: 100%; background: #000d; border: 2px solid #ffd32a; border-radius: 10px; padding: 15px; display: flex; flex-direction: column; gap: 10px; z-index: 20; }
+#epilogue-speaker { font-weight: bold; color: #ffd32a; font-size: 15px; border-bottom: 1px solid #444; padding-bottom: 3px; }
+#epilogue-text { font-size: 14px; min-height: 60px; line-height: 1.5; white-space: pre-wrap; }
+.the-end-text { font-size: 36px; font-weight: bold; color: #ff3f34; text-align: center; letter-spacing: 6px; animation: fadeIn 1.5s ease-in-out; margin: 15px 0; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+.result-img { width: 150px; height: 150px; margin-bottom: 20px; background: #444; border-radius: 10px; object-fit: contain; }
+#config-overlay { display: none; position: absolute; inset: 0; background: #000c; z-index: 100; justify-content: center; align-items: center; }
+.modal { background: #2f3542; padding: 20px; border-radius: 10px; width: 85%; max-width: 350px; text-align: center; box-shadow: 0 4px 15px #0008; }
+.config-item { margin: 20px 0; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.config-item label { font-size: 14px; font-weight: bold; color: #ff6b81; }
+.volume-slider { width: 80%; accent-color: #ff4757; cursor: pointer; }
+@media (max-height: 580px) { #char-select-screen { padding: 10px; } .select-heading { margin: 0 0 10px; } .char-select-btn-img,.char-select-placeholder { aspect-ratio: 4/3; } .tutorial-list { flex: 0 0 auto; } .msg-window { height: 44px; } #stage-info { font-size: 14px; } #dialogue-overlay { padding: 9px; gap: 6px; } }
+</style>
+</head>
+<body>
+<div id="game-container">
+<audio id="bgm-player" loop preload="none"></audio>
+<audio id="se-player" preload="none"></audio>
+<div id="title-screen" class="screen active">
+  <div id="title-fallback" class="title-fallback"><strong>東方紅魔郷</strong><span>ステージ攻略バトル<br>— ILLUSTRATION DEMO —</span></div>
+  <img id="title-bg-img" class="title-bg-img" src="image.png" alt="タイトル背景" onload="this.style.display='block'" onerror="this.style.display='none'">
+  <button class="title-start-btn" onclick="startGameStartSequence()">START</button>
+</div>
+<div id="prologue-screen" class="screen">
+  <div class="prologue-title">PROLOGUE</div>
+  <div class="prologue-text-box"><div id="prologue-text" class="prologue-text"></div></div>
+  <button style="width:100%;letter-spacing:2px;" onclick="changeScreen('tutorial-screen')">NEXT</button>
+</div>
+<div id="tutorial-screen" class="screen">
+  <div class="tutorial-title">HOW TO PLAY</div>
+  <div class="tutorial-list">
+    <div class="tutorial-item"><div class="tutorial-item-header">⚔️ 通常攻撃</div><div class="tutorial-item-desc">敵に安定したダメージを与えます。まずはこれを選んで敵のHPを削っていきましょう。</div></div>
+    <div class="tutorial-item"><div class="tutorial-item-header" style="color:#2ed573;">🛡️ グレイズ</div><div class="tutorial-item-desc">敵の通常攻撃をかすり抜けて無効化し、さらに自身のHPを大きく回復します。ただし、特殊な「グレイズ不可攻撃」などには無力なので注意。</div></div>
+    <div class="tutorial-item"><div class="tutorial-item-header" style="color:#ffd32a;">🌟 スペル</div><div class="tutorial-item-desc">敵に超大ダメージを与える切り札です。同時に、そのターンの敵からの攻撃を完全に無効化します。使用回数に制限があります（通常：各ステージ1回／EX：2回）。</div></div>
+  </div>
+  <button style="width:100%;letter-spacing:2px;background:#ffd32a;color:#000;box-shadow:0 4px #fed330;margin-top:15px;" onclick="changeScreen('char-select-screen')">NEXT</button>
+</div>
+<div id="char-select-screen" class="screen">
+  <div class="select-heading"><div style="width:50px;flex-shrink:0"></div><h2>CHARACTER SELECT</h2><button class="tiny-config-btn" onclick="toggleConfig(true)">CONFIG</button></div>
+  <div id="char-list"></div>
+</div>
+<div id="battle-screen" class="screen">
+  <div id="stage-info">STAGE 1</div>
+  <div id="battle-field">
+    <div class="battle-side" id="enemy-side">
+      <div class="char-name" id="enemy-name">敵キャラクター</div>
+      <div class="hp-bar-container"><div class="hp-bar" id="enemy-hp"></div></div>
+      <div class="char-img-box" id="enemy-img-box"><img id="enemy-avatar" class="char-img" alt="敵画像"></div>
+      <div class="msg-window" id="enemy-msg">状況ログ...</div>
+    </div>
+    <div class="battle-side" id="player-side">
+      <div class="char-name" id="player-name">自機</div>
+      <div class="hp-bar-container"><div class="hp-bar" id="player-hp"></div></div>
+      <div class="char-img-box" id="player-img-box"><img id="player-avatar" class="char-img" alt="自機画像"></div>
+      <div class="msg-window" id="player-msg">自機ログ...</div>
+    </div>
+  </div>
+  <div id="control-area">
+    <div id="battle-commands">
+      <button class="action-btn" onclick="playerAction('attack')">通常攻撃</button>
+      <button class="action-btn" onclick="playerAction('graze')">グレイズ</button>
+      <button class="action-btn" id="spell-btn" onclick="playerAction('spell')">スペル</button>
+    </div>
+    <div id="config-row"><span id="turn-display">TURN 1</span><button id="config-btn" onclick="toggleConfig(true)">CONFIG</button></div>
+  </div>
+  <div id="dialogue-overlay" role="dialog" aria-label="会話">
+    <div id="dialogue-speaker"></div><div id="dialogue-text"></div>
+    <div id="dialogue-btn-area"><button id="dialogue-next-btn" onclick="advanceDialogue()" style="padding:6px 16px;font-size:14px;box-shadow:none;">NEXT</button></div>
+  </div>
+  <div id="clear-banner">STAGE CLEAR</div>
+</div>
+<div id="epilogue-screen" class="screen">
+  <div class="epilogue-event-container"><img id="epilogue-event-img" class="epilogue-event-img" alt="イベントスチル" onerror="this.style.display='none'"></div>
+  <div id="epilogue-overlay">
+    <div id="epilogue-speaker">EPILOGUE</div><div id="epilogue-text"></div>
+    <div style="display:flex;justify-content:flex-end;"><button onclick="advanceEpilogue()" style="padding:6px 16px;font-size:14px;background:#ffd32a;color:#000;box-shadow:0 4px #fed330;">NEXT</button></div>
+  </div>
+</div>
+<div id="game-over-screen" class="screen">
+  <h2 style="color:#ff4757;font-size:32px;margin-bottom:20px;">GAME OVER</h2>
+  <img id="gameover-img" class="result-img" alt="ゲームオーバーイラスト" onerror="this.style.display='none'">
+  <button onclick="returnToTitle()">TITLE RESTART</button>
+</div>
+<div id="config-overlay" role="dialog" aria-modal="true" aria-label="設定">
+  <div class="modal">
+    <h3>CONFIG</h3>
+    <div class="config-item"><label for="bgm-volume">BGM &amp; SE VOLUME (<span id="vol-value">50</span>%)</label><input type="range" id="bgm-volume" class="volume-slider" min="0" max="100" value="50" oninput="adjustVolume(this.value)"></div>
+    <div class="config-item"><label for="font-select">FONT STYLE</label><select id="font-select" onchange="changeFont(this.value)" style="padding:5px;font-size:14px;border-radius:5px;width:80%;"><option value="'Helvetica Neue', Arial, sans-serif">標準 (ゴシック体)</option><option value="'Yu Mincho', 'MS PMincho', serif">明朝体</option><option value="'Courier New', monospace">等幅フォント (レトロ調)</option><option value="Impact, sans-serif">インパクト (太字)</option></select></div>
+    <button onclick="toggleConfig(false)">閉じる</button>
+  </div>
+</div>
+</div>
+<script>
+'use strict';
+// ==========================================
+// ★ マスターデータ：元の設定、会話、戦闘ルールを維持 ★
+// ==========================================
+const GAME_DATA = {
+  titleAndMenuBgm: "audio/title_menu_bgm.mp3",
+  charSelectBgImage: "url('assets/select_bg.png')",
+  gameoverImage: "assets/gameover.png",
+  commonDialogueBgm: "audio/dialogue_bgm.mp3",
+  epilogueBgmNormal: "audio/epilogue_normal.mp3",
+  epilogueBgmEx: "audio/epilogue_ex.mp3",
+  se: { attack: "audio/se_attack.mp3", graze: "audio/se_graze.mp3", spell: "audio/se_spell.mp3", damage: "audio/se_damage.mp3" },
+  prologue: {
+    bgImage: "url('assets/prologue_bg.png')",
+    text: "幻想郷を突如として包み込んだ、不気味で奇妙な紅い霧。\n\n日光を遮るその霧は、瞬く間に人間の里や博麗神社にまで広がり、人々の平穏な生活を脅かし始めていた。\n\n博麗神社の巫女・博麗霊夢、そして魔法使い・霧雨魔理沙は、異変の出処が湖のほとりに建つ「紅魔館」であることを突き止める。\n\nそれぞれの思惑を胸に、少女たちは紅い霧の深淵へと飛び込んだ――。"
+  },
+  normalEpilogue: { bgImage: "url('assets/bg_epilogue_normal.png')", textList: [
+    "こうして、紅魔館を包んでいた怪しい霧は完全に晴れ渡った。",
+    "博麗神社にはいつも通りの穏やかな、そして少し騒がしい日常が戻ってくる。",
+    "幻想郷に迫ったひとつの異変は解決した。\n―― NORMAL ROUTE END ――"
+  ] },
+  exEpilogue: { bgImage: "url('assets/bg_epilogue_ex.png')", eventImage: "assets/event_ex_still.png", textList: [
+    "地下に潜む、さらなる混沌の破壊衝動すらも二人の力でねじ伏せた。",
+    "本当の意味で、今回の異変に関わる全ての因果が解消されたのだ。",
+    "幻想郷の夜空に、美しい星々が瞬いている。\n―― EXTRA ROUTE TRUE END ――"
+  ] },
+  players: [
+    { id: "player1", name: "博麗 霊夢", avatarSelect: "assets/reimu_select.png", avatarNormal: "assets/reimu_normal.png", avatarTalk: "assets/reimu_talk.png", maxHp: 100,
+      lines: { attack: "そこっっっ！", graze: "ふふん、当たらないわ！", spell: "夢想封印ーー！！", damage: "きゃああっ！" } },
+    { id: "player2", name: "霧雨 魔理沙", avatarSelect: "assets/marisa_select.png", avatarNormal: "assets/marisa_normal.png", avatarTalk: "assets/marisa_talk.png", maxHp: 90,
+      lines: { attack: "狙い撃ちだぜ！", graze: "かすったぜ！", spell: "マスタースパークーー！！", damage: "くっっっ！" } },
+    { id: "player_ex", name: "霊夢＆魔理沙 (EX)", avatarSelect: "assets/ex_player_select.png", avatarNormal: "assets/ex_player_normal.png", avatarTalk: "assets/ex_player_talk.png", maxHp: 120,
+      lines: { attack: "コンビネーション！", graze: "見切れるぜ！", spell: "連携スペル発動！！", damage: "しまっ…！？" } }
+  ],
+  enemies: [
+    { stage: 1, stageName: "STAGE 1 - 宵闇の妖怪", name: "ルーミア", maxHp: 60,
+      avatarNormal: "assets/enemy1.png", avatarDefeated: "assets/enemy1_down.png", avatarTalkDefeated: "assets/enemy1_talk_down.png", bgImage: "url('assets/bg_stage1.png')", bgmBattle: "audio/battle_enemy1.mp3", lineSpell: "そーなのかー！",
+      talkBefore_player1: [{ speaker: 1, text: "こんな夜遅くに人間の参拝客かしら？" }, { speaker: 0, text: "夜道をうろつく妖怪退治に決まってるでしょ。" }],
+      talkAfter_player1: [{ speaker: 1, text: "ひぅ、やっぱり巫女は強いやー！" }, { speaker: 0, text: "さ、先を急ぎましょう。" }],
+      talkBefore_player2: [{ speaker: 1, text: "あ、魔法使いだ。夜食にちょうどいいかも。" }, { speaker: 0, text: "悪いが、私の弾幕はちょっとばかし硬いぜ？" }],
+      talkAfter_player2: [{ speaker: 1, text: "うぅ、お腹いたーい。弾幕なんて食べるもんじゃないね…" }, { speaker: 0, text: "そーなのかー。じゃあな！" }]
+    },
+    { stage: 2, stageName: "STAGE 2 - 氷の妖精", name: "チルノ", maxHp: 80,
+      avatarNormal: "assets/enemy2.png", avatarDefeated: "assets/enemy2_down.png", avatarTalkDefeated: "assets/enemy2_talk_down.png", bgImage: "url('assets/bg_stage2.png')", bgmBattle: "audio/battle_enemy2.mp3", lineSpell: "あたいは最強ね！",
+      talkBefore_player1: [{ speaker: 1, text: "あたいの縄張りに何の用よ！" }], talkAfter_player1: [{ speaker: 1, text: "あたいが負けるはずないのにー！" }],
+      talkBefore_player2: [{ speaker: 1, text: "冷たくしてやるんだから！" }], talkAfter_player2: [{ speaker: 0, text: "ちょっとは冷えたぜ。" }]
+    },
+    { stage: 3, stageName: "STAGE 3 - 華人小娘", name: "紅 美鈴", maxHp: 100,
+      avatarNormal: "assets/enemy3.png", avatarDefeated: "assets/enemy3_down.png", avatarTalkDefeated: "assets/enemy3_talk_down.png", bgImage: "url('assets/bg_stage3.png')", bgmBattle: "audio/battle_enemy3.mp3", lineSpell: "ここを通すわけにはいきません！",
+      talkBefore_player1: [{ speaker: 1, text: "ここから先は紅魔館の敷地ですよ。" }], talkAfter_player1: [{ speaker: 1, text: "うぅ…申し訳ありません…" }],
+      talkBefore_player2: [{ speaker: 0, text: "門番さん、ちょっと通してくれ！" }], talkAfter_player2: [{ speaker: 0, text: "不法侵入成功だぜ！" }]
+    },
+    { stage: 4, stageName: "STAGE 4 - 動かない大図書館", name: "パチュリー", maxHp: 120,
+      avatarNormal: "assets/enemy4.png", avatarDefeated: "assets/enemy4_down.png", avatarTalkDefeated: "assets/enemy4_talk_down.png", bgImage: "url('assets/bg_stage4.png')", bgmBattle: "audio/battle_enemy4.mp3", lineSpell: "動くと熱い火の粉が飛ぶわよ。",
+      talkBefore_player1: [{ speaker: 1, text: "邪魔者は排除するわ。" }], talkAfter_player1: [{ speaker: 1, text: "魔力が保たないわ…" }],
+      talkBefore_player2: [{ speaker: 1, text: "また私の本を盗みにきたの？" }], talkAfter_player2: [{ speaker: 0, text: "あとで読ませてもらうぜ！" }]
+    },
+    { stage: 5, stageName: "STAGE 5 - 悪魔のメイド", name: "十六夜 咲夜", maxHp: 150,
+      avatarNormal: "assets/enemy5.png", avatarDefeated: "assets/enemy5_down.png", avatarTalkDefeated: "assets/enemy5_talk_down.png", bgImage: "url('assets/bg_stage5.png')", bgmBattle: "audio/battle_enemy5.mp3", lineSpell: "私の世界についてこられるかしら？",
+      talkBefore_player1: [{ speaker: 1, text: "あなたの時間を止めて差し上げましょう。" }], talkAfter_player1: [{ speaker: 1, text: "お嬢様、お気をつけて…" }],
+      talkBefore_player2: [{ speaker: 0, text: "綺麗なナイフだな、ちょっと借りるぜ！" }], talkAfter_player2: [{ speaker: 1, text: "手癖の悪いネズミですね…" }]
+    },
+    { stage: 6, stageName: "STAGE 6 - 永遠に紅い幼き月", name: "レミリア", maxHp: 200,
+      avatarNormal: "assets/enemy6.png", avatarDefeated: "assets/enemy6_down.png", avatarTalkDefeated: "assets/enemy6_talk_down.png", bgImage: "url('assets/bg_stage6.png')", bgmBattle: "audio/battle_enemy6.mp3", lineSpell: "紅い月の下で眠りなさい。",
+      talkBefore_player1: [{ speaker: 1, text: "あなたの運命を弄んであげる！" }], talkAfter_player1: [{ speaker: 1, text: "私の負けね…霧は晴らすわ。" }],
+      talkBefore_player2: [{ speaker: 1, text: "人間、私に勝てると思っているの？" }], talkAfter_player2: [{ speaker: 0, text: "弾幕はパワーだ！私の勝ちだな！" }]
+    }
+  ],
+  enemyEx: {
+    stage: "EX", stageName: "EXTRA STAGE - 悪魔の妹", name: "フランドール", maxHp: 300,
+    avatarNormal: "assets/enemy_ex.png", avatarDefeated: "assets/enemy_ex_down.png", avatarTalkDefeated: "assets/enemy_ex_talk_down.png", bgImage: "url('assets/bg_stage_ex.png')", bgmBattle: "audio/battle_ex.mp3", lineSpell: "きゅっとしてドカーン！",
+    talkBefore_player_ex: [{ speaker: 1, text: "あははは！私と楽しく壊し合いをしましょう！" }],
+    talkAfter_player_ex: [{ speaker: 1, text: "あー楽しかった！また遊んでね！" }]
+  }
+};
+
+// ==========================================
+// ★ ゲームシステム ★
+// ==========================================
+const SAVE_KEYS = { exUnlocked: 'touhou_stage_game_ex_unlocked_v1', volume: 'touhou_stage_game_volume_v1', font: 'touhou_stage_game_font_v1' };
+function loadSaved(key, fallback) {
+  try { const saved = localStorage.getItem(key); return saved === null ? fallback : saved; }
+  catch (err) { return fallback; } // ファイル直開きやプライベートモードでも実行する
+}
+function saveValue(key, value) {
+  try { localStorage.setItem(key, String(value)); }
+  catch (err) { /* 保存不可の場合でもゲームを続行 */ }
+}
+const gameState = {
+  isExMode: false, exUnlocked: loadSaved(SAVE_KEYS.exUnlocked, 'false') === 'true', selectedPlayer: null,
+  currentStageIdx: 0, playerHp: 0, enemyHp: 0, playerMaxHp: 0, enemyMaxHp: 0, spellCount: 0,
+  turnCount: 1, enemyCharge: 0, enemySpellUsed: false, dialoguePhase: 'before', dialogueIdx: 0,
+  epilogueIdx: 0, currentVolume: .5, battleActive: false
+};
+const $ = id => document.getElementById(id);
+function setBackground(id, value, fallbackColor) {
+  const el = $(id);
+  // 画像が assets/ の中にあっても、正しいCSS url(...)をそのまま使う
+  el.style.backgroundImage = value || 'none';
+  el.style.backgroundColor = fallbackColor || '#222';
+}
+function setBattleAvatar(which, src, label) {
+  const img = $(`${which}-avatar`);
+  const box = $(`${which}-img-box`);
+  box.dataset.fallback = label;
+  box.classList.remove('image-missing');
+  img.style.visibility = 'visible';
+  img.onload = () => { img.style.visibility = 'visible'; box.classList.remove('image-missing'); };
+  img.onerror = () => { img.style.visibility = 'hidden'; box.classList.add('image-missing'); };
+  if (src) img.src = src;
+  else img.onerror();
+}
+function changeScreen(screenId) {
+  const next = $(screenId);
+  if (!next) { console.error('画面が見つかりません:', screenId); return; }
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  next.classList.add('active');
+  if (['title-screen', 'prologue-screen', 'tutorial-screen', 'char-select-screen'].includes(screenId)) playBGM(GAME_DATA.titleAndMenuBgm);
+  if (screenId === 'prologue-screen') initPrologue();
+  if (screenId === 'char-select-screen') initCharSelect();
+}
+function startGameStartSequence() { changeScreen('prologue-screen'); }
+function initPrologue() {
+  setBackground('prologue-screen', GAME_DATA.prologue.bgImage, '#000');
+  $('prologue-text').innerText = GAME_DATA.prologue.text;
+}
+function initCharSelect() {
+  setBackground('char-select-screen', GAME_DATA.charSelectBgImage, '#111');
+  const charList = $('char-list');
+  charList.replaceChildren();
+  const mainRow = document.createElement('div'); mainRow.id = 'char-select-main-row';
+  GAME_DATA.players.forEach((p, idx) => {
+    if (p.id === 'player_ex') return;
+    const btn = document.createElement('button'); btn.type = 'button'; btn.className = 'char-select-btn';
+    btn.onclick = () => selectCharacter(idx, false);
+    const img = document.createElement('img'); img.className = 'char-select-btn-img'; img.alt = p.name;
+    const placeholder = document.createElement('div'); placeholder.className = 'char-select-placeholder'; placeholder.innerText = p.name;
+    img.onload = () => { img.style.display = 'block'; placeholder.style.display = 'none'; };
+    img.onerror = () => { img.style.display = 'none'; placeholder.style.display = 'flex'; };
+    img.src = p.avatarSelect;
+    const info = document.createElement('div'); info.className = 'char-select-btn-info';
+    info.innerHTML = `<div class="char-select-btn-name"></div><div class="char-select-btn-hp"></div><div class="char-select-btn-hint">START</div>`;
+    info.children[0].textContent = p.name;
+    info.children[1].textContent = `MAX HP: ${p.maxHp}`;
+    btn.append(img, placeholder, info); mainRow.appendChild(btn);
+  });
+  charList.appendChild(mainRow);
+  if (gameState.exUnlocked) {
+    const exRow = document.createElement('div'); exRow.id = 'ex-select-btn-row';
+    const btn = document.createElement('button'); btn.className = 'ex-select-btn'; btn.type = 'button';
+    btn.onclick = () => selectCharacter(2, true);
+    btn.innerHTML = `<span class="ex-select-btn-icon">★</span><span class="ex-select-btn-text"><span class="ex-select-btn-name">EXTRA STAGE (EX)</span><span class="ex-select-btn-hint">専用コンビネーション機で出撃</span></span>`;
+    exRow.appendChild(btn); charList.appendChild(exRow);
+  }
+}
+function adjustVolume(val) {
+  const normalized = Math.max(0, Math.min(1, Number(val) / 100));
+  gameState.currentVolume = normalized;
+  $('bgm-player').volume = normalized;
+  $('se-player').volume = normalized;
+  $('vol-value').textContent = Math.round(normalized * 100);
+  saveValue(SAVE_KEYS.volume, normalized);
+}
+function changeFont(fontFamily) { document.body.style.fontFamily = fontFamily; saveValue(SAVE_KEYS.font, fontFamily); }
+function selectCharacter(idx, isEx) {
+  if (isEx && !gameState.exUnlocked) return;
+  gameState.selectedPlayer = GAME_DATA.players[idx];
+  if (!gameState.selectedPlayer) return;
+  gameState.isExMode = isEx;
+  gameState.currentStageIdx = 0;
+  changeScreen('battle-screen');
+  initStageData();
+}
+function currentEnemy() { return gameState.isExMode ? GAME_DATA.enemyEx : GAME_DATA.enemies[gameState.currentStageIdx]; }
+function setBattleEnabled(enabled) {
+  gameState.battleActive = enabled;
+  const area = $('control-area'); area.style.opacity = enabled ? '1' : '.3';
+  document.querySelectorAll('.action-btn').forEach(b => { b.disabled = !enabled; });
+  if (enabled) updateCommandButtons();
+}
+function initStageData() {
+  const pData = gameState.selectedPlayer, eData = currentEnemy();
+  if (!pData || !eData) return;
+  gameState.playerMaxHp = pData.maxHp; gameState.playerHp = pData.maxHp;
+  gameState.enemyMaxHp = eData.maxHp; gameState.enemyHp = eData.maxHp;
+  gameState.spellCount = 0; gameState.turnCount = 1; gameState.enemyCharge = 0; gameState.enemySpellUsed = false;
+  $('stage-info').innerText = eData.stageName || (gameState.isExMode ? 'EXTRA STAGE' : `STAGE ${eData.stage}`);
+  $('player-name').innerText = pData.name; $('enemy-name').innerText = eData.name;
+  setBackground('battle-screen', eData.bgImage, '#222');
+  setBattleAvatar('player', pData.avatarNormal, pData.name);
+  setBattleAvatar('enemy', eData.avatarNormal, eData.name);
+  $('player-msg').style.visibility = 'hidden'; $('enemy-msg').style.visibility = 'hidden';
+  $('clear-banner').style.display = 'none'; $('dialogue-overlay').style.display = 'none';
+  $('dialogue-next-btn').onclick = advanceDialogue; // ステージクリア時の専用処理を解除
+  setBattleEnabled(false); updateHpBars();
+  gameState.dialoguePhase = 'before'; gameState.dialogueIdx = 0;
+  playBGM(GAME_DATA.commonDialogueBgm);
+  startDialoguePhase();
+}
+function startDialoguePhase() {
+  const eData = currentEnemy(), pData = gameState.selectedPlayer;
+  const propName = `${gameState.dialoguePhase === 'before' ? 'talkBefore' : 'talkAfter'}_${pData.id}`;
+  const lines = eData[propName] || [];
+  if (gameState.dialogueIdx >= lines.length) { endDialoguePart(); return; }
+  const talk = lines[gameState.dialogueIdx];
+  $('dialogue-overlay').style.display = 'flex';
+  $('dialogue-next-btn').onclick = advanceDialogue;
+  if (talk.speaker === 0) {
+    $('dialogue-overlay').style.borderColor = '#ff4757';
+    $('dialogue-speaker').textContent = pData.name;
+    setBattleAvatar('player', pData.avatarTalk, pData.name);
+  } else {
+    $('dialogue-overlay').style.borderColor = '#535c68';
+    $('dialogue-speaker').textContent = eData.name;
+    setBattleAvatar('enemy', gameState.dialoguePhase === 'after' ? (eData.avatarTalkDefeated || eData.avatarDefeated) : eData.avatarNormal, eData.name);
+  }
+  $('dialogue-text').textContent = talk.text;
+}
+function advanceDialogue() {
+  if ($('dialogue-overlay').style.display !== 'flex') return;
+  gameState.dialogueIdx++;
+  startDialoguePhase();
+}
+function endDialoguePart() {
+  $('dialogue-overlay').style.display = 'none';
+  if (gameState.dialoguePhase === 'before') startActualBattle();
+  else showStageClearBanner();
+}
+function startActualBattle() {
+  const eData = currentEnemy(), pData = gameState.selectedPlayer;
+  playBGM(eData.bgmBattle);
+  setBattleAvatar('player', pData.avatarNormal, pData.name);
+  setBattleAvatar('enemy', eData.avatarNormal, eData.name);
+  $('player-msg').style.visibility = 'visible'; $('enemy-msg').style.visibility = 'visible';
+  $('player-msg').textContent = '戦闘開始！アクションを選択してください。';
+  $('enemy-msg').textContent = '相手の行動を警戒中...';
+  setBattleEnabled(true);
+}
+function showStageClearBanner() {
+  $('clear-banner').style.display = 'block';
+  $('dialogue-overlay').style.display = 'flex';
+  $('dialogue-overlay').style.borderColor = '#ffd32a';
+  $('dialogue-speaker').textContent = 'SYSTEM';
+  $('dialogue-text').textContent = 'ステージクリア！次のステップへ。';
+  $('dialogue-next-btn').onclick = proceedToNextStage;
+}
+function proceedToNextStage() {
+  $('dialogue-overlay').style.display = 'none';
+  if (gameState.isExMode || gameState.currentStageIdx >= GAME_DATA.enemies.length - 1) startEpiloguePhase();
+  else { gameState.currentStageIdx++; initStageData(); }
+}
+function startEpiloguePhase() {
+  gameState.epilogueIdx = 0;
+  const data = gameState.isExMode ? GAME_DATA.exEpilogue : GAME_DATA.normalEpilogue;
+  setBackground('epilogue-screen', data.bgImage, '#000');
+  const eventImg = $('epilogue-event-img');
+  if (gameState.isExMode && data.eventImage) {
+    eventImg.style.display = 'block';
+    eventImg.onload = () => { eventImg.style.display = 'block'; };
+    eventImg.onerror = () => { eventImg.style.display = 'none'; };
+    eventImg.src = data.eventImage;
+  } else { eventImg.style.display = 'none'; eventImg.removeAttribute('src'); }
+  changeScreen('epilogue-screen');
+  playBGM(gameState.isExMode ? GAME_DATA.epilogueBgmEx : GAME_DATA.epilogueBgmNormal);
+  updateEpilogueText();
+}
+function updateEpilogueText() {
+  const data = gameState.isExMode ? GAME_DATA.exEpilogue : GAME_DATA.normalEpilogue;
+  if (gameState.epilogueIdx < data.textList.length) {
+    $('epilogue-speaker').textContent = gameState.isExMode ? 'EXTRA EPILOGUE' : 'EPILOGUE';
+    $('epilogue-text').textContent = data.textList[gameState.epilogueIdx];
+  } else if (gameState.epilogueIdx === data.textList.length) {
+    $('epilogue-event-img').style.display = 'none';
+    $('epilogue-speaker').textContent = 'SYSTEM';
+    $('epilogue-text').replaceChildren();
+    const end = document.createElement('div'); end.className = 'the-end-text'; end.textContent = 'THE END';
+    $('epilogue-text').appendChild(end);
+  } else {
+    if (!gameState.isExMode) {
+      gameState.exUnlocked = true;
+      saveValue(SAVE_KEYS.exUnlocked, 'true'); // 通常ルートを最後まで読んだ後、再読み込みしてもEX解放を保持
+    }
+    returnToTitle();
+  }
+}
+function advanceEpilogue() { gameState.epilogueIdx++; updateEpilogueText(); }
+
+// ==========================================
+// ★ バトルロジック：原作コードのダメージ計算を保持 ★
+// ==========================================
+function playerAction(action) {
+  if (!gameState.battleActive || !['attack', 'graze', 'spell'].includes(action)) return;
+  if (action === 'spell' && gameState.spellCount >= (gameState.isExMode ? 2 : 1)) return;
+  const pData = gameState.selectedPlayer, eData = currentEnemy();
+  let pLog = '', eLog = '', enemyActionType = 'normal';
+  if (gameState.isExMode) {
+    gameState.enemyCharge++;
+    if (gameState.enemyCharge >= 3) { enemyActionType = 'spell'; gameState.enemyCharge = 0; }
+    else enemyActionType = Math.random() < .5 ? 'normal' : 'noGraze';
+  } else if (gameState.enemyHp <= gameState.enemyMaxHp / 2 && !gameState.enemySpellUsed) {
+    enemyActionType = 'spell'; gameState.enemySpellUsed = true;
+  } else enemyActionType = Math.random() < .5 ? 'normal' : 'noGraze';
+  let playerAvatarSrc = pData.avatarNormal;
+  if (action === 'attack') {
+    playSE(GAME_DATA.se.attack); pLog = '通常攻撃！';
+    gameState.enemyHp -= Math.floor(gameState.enemyMaxHp / 5);
+  } else if (action === 'graze') {
+    playSE(GAME_DATA.se.graze); pLog = 'グレイズを選択！'; playerAvatarSrc = pData.avatarTalk;
+  } else {
+    playSE(GAME_DATA.se.spell); pLog = 'スペル発動！'; gameState.spellCount++;
+    gameState.enemyHp -= Math.floor(gameState.enemyMaxHp / 3);
+  }
+  if (gameState.enemyHp <= 0) {
+    gameState.enemyHp = 0;
+    updateHpBars(); setBattleEnabled(false);
+    setBattleAvatar('enemy', eData.avatarDefeated || eData.avatarNormal, eData.name);
+    gameState.dialoguePhase = 'after'; gameState.dialogueIdx = 0;
+    playBGM(GAME_DATA.commonDialogueBgm);
+    startDialoguePhase();
+    return;
+  }
+  if (action === 'spell') eLog = 'スペルで敵攻撃を無効化した。';
+  else if (enemyActionType === 'normal') {
+    if (action === 'graze') {
+      const heal = Math.floor(gameState.playerMaxHp / 3);
+      gameState.playerHp = Math.min(gameState.playerMaxHp, gameState.playerHp + heal);
+      eLog = '敵通常攻撃をグレイズ！HP回復！';
+    } else {
+      const dmg = Math.floor(gameState.playerMaxHp / 5);
+      gameState.playerHp -= dmg; playerAvatarSrc = pData.avatarTalk;
+      eLog = `通常攻撃被弾！ ${dmg} ダメージ`; playSE(GAME_DATA.se.damage);
+    }
+  } else if (enemyActionType === 'noGraze') {
+    const dmg = Math.floor(gameState.playerMaxHp / (action === 'graze' ? 4 : 8));
+    gameState.playerHp -= dmg; playerAvatarSrc = pData.avatarTalk;
+    eLog = action === 'graze' ? `グレイズ不可攻撃！被弾！ ${dmg} ダメージ` : `グレイズ不可攻撃を受撃。 ${dmg} ダメージ`;
+    playSE(GAME_DATA.se.damage);
+  } else if (enemyActionType === 'spell') {
+    eLog = `敵スペル発動！『${eData.lineSpell}』`;
+    if (gameState.isExMode) {
+      gameState.playerHp = 0; eLog += ' グレイズ不可一撃必殺！'; playSE(GAME_DATA.se.damage);
+    } else if (action === 'graze') {
+      if (gameState.currentStageIdx === 4 || gameState.currentStageIdx === 5) {
+        const dmg = Math.floor(gameState.playerMaxHp / 4);
+        gameState.playerHp -= dmg; playerAvatarSrc = pData.avatarTalk;
+        eLog += ` グレイズ貫通！ ${dmg} ダメージ`; playSE(GAME_DATA.se.damage);
+      } else eLog += ' グレイズで無効化した！';
+    } else {
+      const dmg = Math.floor(gameState.playerMaxHp / 3);
+      gameState.playerHp -= dmg; playerAvatarSrc = pData.avatarTalk;
+      eLog += ` 直撃！ ${dmg} ダメージ`; playSE(GAME_DATA.se.damage);
+    }
+  }
+  setBattleAvatar('player', playerAvatarSrc, pData.name);
+  $('player-msg').textContent = pLog; $('enemy-msg').textContent = eLog;
+  if (gameState.playerHp <= 0) { gameState.playerHp = 0; updateHpBars(); gameOver(); return; }
+  gameState.turnCount++; updateHpBars(); updateCommandButtons();
+}
+function updateHpBars() {
+  const p = gameState.playerMaxHp ? 100 * gameState.playerHp / gameState.playerMaxHp : 0;
+  const e = gameState.enemyMaxHp ? 100 * gameState.enemyHp / gameState.enemyMaxHp : 0;
+  $('player-hp').style.width = Math.max(0, Math.min(100,p)) + '%';
+  $('enemy-hp').style.width = Math.max(0, Math.min(100,e)) + '%';
+  $('turn-display').textContent = `TURN ${gameState.turnCount}`;
+}
+function updateCommandButtons() {
+  $('spell-btn').disabled = !gameState.battleActive || gameState.spellCount >= (gameState.isExMode ? 2 : 1);
+}
+function playBGM(src) {
+  const bgm = $('bgm-player'); if (!src) return;
+  if (bgm.getAttribute('src') !== src) { bgm.pause(); bgm.setAttribute('src', src); bgm.load(); }
+  bgm.volume = gameState.currentVolume;
+  if (bgm.paused) {
+    const promise = bgm.play();
+    if (promise) promise.catch(() => {}); // 素材未配置／自動再生制限でもゲームを止めない
+  }
+}
+function playSE(src) {
+  if (!src) return;
+  const se = $('se-player');
+  se.pause(); se.setAttribute('src', src); se.volume = gameState.currentVolume;
+  se.currentTime = 0;
+  const promise = se.play(); if (promise) promise.catch(() => {});
+}
+function gameOver() {
+  setBattleEnabled(false);
+  const img = $('gameover-img');
+  img.style.display = GAME_DATA.gameoverImage ? 'block' : 'none';
+  if (GAME_DATA.gameoverImage) { img.src = GAME_DATA.gameoverImage; }
+  $('bgm-player').pause();
+  changeScreen('game-over-screen');
+}
+function returnToTitle() {
+  setBattleEnabled(false);
+  $('dialogue-overlay').style.display = 'none';
+  $('config-overlay').style.display = 'none';
+  changeScreen('title-screen');
+}
+function toggleConfig(show) { $('config-overlay').style.display = show ? 'flex' : 'none'; }
+window.addEventListener('DOMContentLoaded', () => {
+  const savedVolume = Number(loadSaved(SAVE_KEYS.volume, .5));
+  adjustVolume(Number.isFinite(savedVolume) ? savedVolume * 100 : 50);
+  const font = loadSaved(SAVE_KEYS.font, "'Helvetica Neue', Arial, sans-serif");
+  if ([...$('font-select').options].some(o => o.value === font)) { $('font-select').value = font; document.body.style.fontFamily = font; }
+  $('title-bg-img').onload = () => { $('title-bg-img').style.display = 'block'; $('title-fallback').style.display = 'block'; };
+  $('title-bg-img').onerror = () => { $('title-bg-img').style.display = 'none'; $('title-fallback').style.display = 'block'; };
+  if ($('title-bg-img').complete) { if ($('title-bg-img').naturalWidth) $('title-bg-img').onload(); else $('title-bg-img').onerror(); }
+});
+</script>
+</body>
+</html>
